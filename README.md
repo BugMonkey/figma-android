@@ -15,24 +15,33 @@ Figma 设计稿转 Android 代码。通过本地 Figma 桌面端插件读取节�
 
 ## 安装
 
-```bash
-skillhub install figma-android --namespace user_140863df
-```
-
-需要指定宿主 skills 目录时：
+`skillhub install` 会下载到 `@user_140863df/figma-android` 命名空间目录；ZCode / Claude Code 只扫描 `skills/<name>/SKILL.md` 平铺结构，所以要复制到平铺目录：
 
 ```bash
-skillhub install figma-android --namespace user_140863df --dir <宿主 skills 目录>
+tmp=$(mktemp -d)
+skillhub install figma-android --namespace user_140863df --dir "$tmp"
+mkdir -p ~/.agents/skills/figma-android
+cp -R "$tmp/@user_140863df/figma-android/." ~/.agents/skills/figma-android/
+rm -rf "$tmp"
 ```
 
-> 发布后可用；未发布时可以直接把本目录放到 Agent 的 skills 目录。
+Claude Code 把目标目录换成 `~/.claude/skills/figma-android`。
+
+验证：
+
+```bash
+grep -m1 '^version:' ~/.agents/skills/figma-android/SKILL.md
+python3 ~/.agents/skills/figma-android/scripts/common/figma_selftest.py
+```
 
 Figma 插件：
 
 1. 打开 Figma 桌面端。
 2. 右键画布 → Plugins → Development → Import plugin from manifest...
-3. 选择 `scripts/plugin/manifest.json`。
+3. 选择 `~/.agents/skills/figma-android/scripts/plugin/manifest.json`（Claude Code 用 `~/.claude/skills/...`）。
 4. Development 菜单里会出现 `figma-android-bridge`。
+
+`skillhub list` 不会显示 `--dir` 安装的 Skill，以实际目录和 `SKILL.md` 为准。
 
 ## 提示词速查
 
