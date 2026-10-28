@@ -1,0 +1,16 @@
+{
+  "name": "figma-android-bridge",
+  "id": "figma-android-bridge-plugin",
+  "api": "1.0.0",
+  "main": "code.js",
+  "capabilities": ["inspect"],
+  "enableProposedApi": false,
+  "documentAccess": "dynamic-page",
+  "editorType": ["figma", "dev"],
+  "ui": "ui.html",
+  "networkAccess": {
+    "allowedDomains": ["none"],
+    "devAllowedDomains": ["http://localhost:7789"],
+    "reasoning": "Send extracted design data to figma-android local server for Android code generation"
+  }
+}

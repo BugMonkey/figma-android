@@ -1,0 +1,1386 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>figma-android-bridge</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --accent: #18a0fb;
+    --success: #34c759;
+    --error: #ff3b30;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    margin: 0; padding: 12px;
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 12px; line-height: 1.5;
+  }
+
+  /* 状态栏 */
+  .status-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #ccc;
+    flex-shrink: 0; transition: background 0.3s;
+  }
+  .dot.connected { background: var(--success); }
+  .dot.error { background: var(--error); }
+  .dot.busy { background: var(--accent); animation: pulse 0.8s infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  #status-text {
+    flex: 1; font-weight: 500; word-break: break-all;
+  }
+
+  /* 选中信息 */
+  #selection-info {
+    font-size: 11px; color: #666; margin-bottom: 8px;
+    padding: 6px 8px; background: #f5f5f5; border-radius: 4px;
+    min-height: 20px; word-break: break-all; cursor: pointer;
+  }
+  #selection-info:hover { background: #ebebeb; }
+
+  /* 缩略图预览 */
+  .thumbnail-container {
+    margin-bottom: 8px;
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    overflow: hidden;
+    display: none;
+    position: relative;
+    min-height: 100px;
+    /* 棋盘格背景展示透明区域 */
+    background-image:
+      linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+      linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+      linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+    background-size: 12px 12px;
+    background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
+  }
+  .thumbnail-container.visible { display: flex; align-items: center; justify-content: center; }
+  .thumbnail-container img {
+    max-width: 100%; max-height: 200px; display: block; object-fit: contain;
+  }
+  .thumbnail-label {
+    position: absolute; top: 4px; left: 4px;
+    background: rgba(0,0,0,0.55); color: #fff;
+    font-size: 10px; padding: 2px 6px; border-radius: 3px;
+    pointer-events: none;
+  }
+  .thumbnail-placeholder {
+    display: flex; align-items: center; justify-content: center;
+    height: 100px; color: #aaa; font-size: 12px;
+  }
+
+  /* 日志 */
+  .log {
+    background: #f5f5f5; border-radius: 4px; padding: 6px 8px;
+    min-height: 36px; max-height: 72px; overflow-y: auto;
+    font-family: "SF Mono", Menlo, monospace; font-size: 11px;
+    white-space: pre-wrap; word-break: break-all; margin-bottom: 8px;
+    line-height: 1.4;
+  }
+  .log .entry { margin-bottom: 2px; }
+  .log .entry:last-child { margin-bottom: 0; }
+  .log .time { color: #999; margin-right: 4px; }
+  .log .ok { color: var(--success); }
+  .log .error { color: var(--error); }
+  .log .info { color: var(--accent); }
+
+  /* 按钮 */
+  .btn-row { display: flex; gap: 6px; }
+  .btn {
+    flex: 1; height: 32px; border: none; border-radius: 6px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn:active { opacity: 0.7; }
+  .btn-secondary {
+    background: #f0f0f0; color: var(--fg);
+  }
+
+  /* 操作按钮组（节点选中时展示） */
+  .action-bar {
+    display: none; gap: 6px; margin-bottom: 8px;
+  }
+  .action-bar.visible { display: flex; }
+  .action-btn {
+    flex: 1; height: 28px; border: none; border-radius: 5px;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s; line-height: 28px; text-align: center;
+  }
+  .action-btn:active { opacity: 0.7; }
+  .action-btn.primary {
+    background: #18a0fb; color: #fff;
+  }
+  .action-btn.secondary {
+    background: #e8f4fd; color: #18a0fb;
+  }
+  .action-btn .spinner {
+    display: inline-block; width: 10px; height: 10px;
+    border: 1.5px solid rgba(255,255,255,0.3); border-top-color: #fff;
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+    vertical-align: middle; margin-right: 3px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 多选节点卡片 */
+  .multi-node-merged-hint {
+    font-size: 11px; color: #34c759; padding: 2px 4px; margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .multi-node-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 6px; margin-bottom: 2px;
+    background: #e8f4fd; border-radius: 4px;
+    cursor: pointer; font-size: 11px; line-height: 1.4;
+  }
+  .multi-node-item:hover { background: #d0eaff; }
+  .multi-node-item:last-child { margin-bottom: 0; }
+  .multi-node-name { flex: 1; word-break: break-all; color: #18a0fb; }
+  .multi-node-item .copy-label {
+    flex-shrink: 0; margin-left: 8px; font-size: 10px; color: #18a0fb; opacity: 0.7;
+  }
+  .multi-node-item:hover .copy-label { opacity: 1; text-decoration: underline; }
+  .multi-node-parent {
+    font-size: 10px; color: #666; margin-bottom: 4px; padding: 2px 4px;
+  }
+
+  /* 多节点预览列表（可折叠） */
+  .multi-preview-section {
+    margin-bottom: 8px; display: none;
+  }
+  .multi-preview-section.visible { display: block; }
+  .multi-preview-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 8px; background: #f5f5f5; border-radius: 4px;
+    font-size: 11px; font-weight: 600; cursor: pointer; user-select: none;
+    margin-bottom: 4px;
+  }
+  .multi-preview-header:hover { background: #ebebeb; }
+  .multi-preview-toggle { font-size: 10px; color: #18a0fb; }
+  .multi-preview-list { display: flex; flex-direction: column; gap: 4px; }
+  .multi-preview-list.collapsed { display: none; }
+  .multi-preview-item {
+    display: flex; gap: 6px; align-items: flex-start;
+    padding: 4px; background: #fafafa; border: 1px solid #e5e5e5;
+    border-radius: 4px; cursor: pointer;
+  }
+  .multi-preview-item:hover { background: #f0f0f0; }
+  .multi-preview-item .preview-thumb {
+    width: 40px; height: 40px; flex-shrink: 0;
+    border-radius: 3px; object-fit: contain;
+    background-image:
+      linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+      linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+      linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+  }
+  .multi-preview-item .preview-info {
+    flex: 1; min-width: 0; font-size: 10px; line-height: 1.4;
+  }
+  .multi-preview-item .preview-name {
+    font-weight: 600; color: var(--fg); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .multi-preview-item .preview-meta { color: #999; }
+  .multi-preview-item .preview-copy {
+    flex-shrink: 0; font-size: 10px; color: #18a0fb; opacity: 0.7;
+    align-self: center;
+  }
+  .multi-preview-item:hover .preview-copy { opacity: 1; text-decoration: underline; }
+
+  /* Android Shape 代码区 */
+  .shape-code-section { margin-bottom: 8px; display: none; }
+  .shape-code-section.visible { display: block; }
+  .shape-code-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 8px; background: #f5f5f5; border-radius: 4px 4px 0 0;
+    font-size: 11px; font-weight: 600; cursor: pointer; user-select: none;
+  }
+  .shape-code-header:hover { background: #ebebeb; }
+  .shape-code-copy { font-size: 10px; color: #18a0fb; opacity: 0.7; font-weight: 500; }
+  .shape-code-header:hover .shape-code-copy { opacity: 1; text-decoration: underline; }
+  .shape-code-toast { font-size: 10px; color: #34c759; font-weight: 600; display: none; }
+  .shape-code {
+    background: #2b2b2b; color: #e6e6e6; border-radius: 0 0 4px 4px;
+    padding: 8px; margin: 0;
+    font-family: "SF Mono", Menlo, monospace; font-size: 10px; line-height: 1.5;
+    max-height: 180px; overflow: auto;
+    white-space: pre; cursor: pointer;
+  }
+
+  /* 进度 */
+  .progress-bar {
+    height: 3px; background: #e0e0e0; border-radius: 2px;
+    margin-bottom: 8px; overflow: hidden; display: none;
+  }
+  .progress-bar.active { display: block; }
+  .progress-bar .fill {
+    height: 100%; background: var(--accent); border-radius: 2px;
+    width: 0%; transition: width 0.3s;
+  }
+</style>
+</head>
+<body>
+
+  <!-- 状态 -->
+  <div class="status-row">
+    <div class="dot" id="dot"></div>
+    <span id="status-text">就绪</span>
+    <span style="margin-left:auto;font-size:10px;color:#999;font-family:monospace;" id="plugin-version">v2.7</span>
+  </div>
+
+  <!-- 选中信息 -->
+  <div id="selection-info" style="font-size:11px;color:#666;margin-bottom:4px;padding:6px 8px;background:#f5f5f5;border-radius:4px;min-height:20px;word-break:break-all;display:flex;align-items:center;justify-content:space-between;">
+    <span id="selection-info-text" style="cursor:pointer;" onclick="copyNodePng()">未选中节点</span>
+    <button id="btn-re-extract" onclick="reExtract()" style="display:none;font-size:10px;padding:2px 6px;border:1px solid #18a0fb;border-radius:3px;background:#fff;color:#18a0fb;cursor:pointer;">重新提取</button>
+  </div>
+  <div id="selected-node" onclick="copyNodePng()" style="font-size:11px;color:#18a0fb;margin-bottom:4px;padding:6px 8px;background:#e8f4fd;border-radius:4px;display:none;word-break:break-all;line-height:1.6;cursor:pointer;position:relative;">
+    <span id="selected-node-text"></span>
+    <span id="copy-label" style="position:absolute;top:2px;right:6px;font-size:10px;color:#18a0fb;opacity:0.7;">复制</span>
+    <span id="copy-toast" style="display:none;position:absolute;top:2px;right:6px;font-size:10px;color:#34c759;font-weight:600;">已复制</span>
+  </div>
+
+  <!-- 标记状态 -->
+  <div id="mark-status" style="font-size:11px;color:#34c759;margin-bottom:4px;padding:4px 8px;background:#e8f8ed;border-radius:4px;display:none;">🔖 已标记为切图</div>
+  <!-- 操作按钮（选中子节点时展示） -->
+  <div class="action-bar" id="action-bar">
+    <button class="action-btn secondary" id="btn-mark" onclick="markExport()">标记为切图</button>
+    <button class="action-btn primary" id="btn-unmark" onclick="unmarkExport()" style="display:none">取消标记</button>
+    <button class="action-btn primary" id="btn-export" onclick="exportSelectedNode()">下载</button>
+  </div>
+
+  <!-- Android Shape 代码 -->
+  <div class="shape-code-section" id="shape-code-section">
+    <div class="shape-code-header" onclick="copyShapeCode()">
+      <span id="shape-code-title">Android Shape</span>
+      <span class="shape-code-toast" id="shape-copy-toast">已复制</span>
+      <span class="shape-code-copy" id="shape-copy-label">复制</span>
+    </div>
+    <pre class="shape-code" id="shape-code" onclick="copyShapeCode()"></pre>
+  </div>
+
+  <!-- 缩略图 -->
+  <div class="thumbnail-container" id="thumbnail-container">
+    <span class="thumbnail-label" id="thumbnail-label"></span>
+    <img id="thumbnail-img" alt="画板缩略图" style="display:none" />
+    <div class="thumbnail-placeholder" id="thumbnail-placeholder">请在 Figma 中选中画板</div>
+  </div>
+
+  <!-- 多节点预览列表 -->
+  <div class="multi-preview-section" id="multi-preview-section">
+    <div class="multi-preview-header" id="multi-preview-header" onclick="toggleMultiPreview()">
+      <span id="multi-preview-label">已选节点 (<span id="multi-preview-count">0</span>)</span>
+      <span class="multi-preview-toggle" id="multi-preview-toggle">▼ 展开</span>
+    </div>
+    <div class="multi-preview-list" id="multi-preview-list"></div>
+  </div>
+
+  <!-- 进度条 -->
+  <div class="progress-bar" id="progress-bar">
+    <div class="fill" id="progress-fill"></div>
+  </div>
+
+  <!-- 日志 -->
+  <div class="log" id="log"></div>
+
+  <!-- 按钮 -->
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="closePlugin()">关闭</button>
+  </div>
+
+<script>
+var SERVER_URL = 'http://localhost:7789';
+var PENDING_POLL_MS = 2000; // 轮询 server pending 间隔
+// 插件包构建标识：每次修改 code.js / ui.html 后更新。
+// 桥服务器据此判断 Figma 中运行的是否为最新插件，避免"改了代码但插件没热更"被误判为修复无效。
+var PLUGIN_BUILD = '2026-10-20';
+
+var logEl = document.getElementById('log');
+var statusText = document.getElementById('status-text');
+var dotEl = document.getElementById('dot');
+var selInfo = document.getElementById('selection-info');
+var progressBar = document.getElementById('progress-bar');
+var progressFill = document.getElementById('progress-fill');
+var thumbnailContainer = document.getElementById('thumbnail-container');
+var thumbnailImg = document.getElementById('thumbnail-img');
+var thumbnailLabel = document.getElementById('thumbnail-label');
+var thumbnailPlaceholder = document.getElementById('thumbnail-placeholder');
+
+var serverOnline = false;
+var sending = false;
+var lastPendingCheck = false; // 上次 pending 状态，避免重复触发
+var selectedNodeEl = document.getElementById('selected-node');
+var selectedNodeInfo = {}; // 缓存当前选中的节点信息
+var actionBar = document.getElementById('action-bar');
+var shapeCodeSection = document.getElementById('shape-code-section');
+var shapeCodeEl = document.getElementById('shape-code');
+var _currentShapeCode = ''; // 当前展示的 Android shape XML
+var _exportInProgress = false;
+var _mergeDownloadMode = false;
+var _downloadQueue = [];       // 打包下载队列
+var _multiPreviewExpanded = true; // 多选预览展开状态
+
+// 日志
+function log(text, cls) {
+  var div = document.createElement('div');
+  div.className = 'entry';
+  var time = document.createElement('span');
+  time.className = 'time';
+  time.textContent = '[' + new Date().toLocaleTimeString() + ']';
+  div.appendChild(time);
+  var msg = document.createElement('span');
+  if (cls) msg.className = cls;
+  msg.textContent = text;
+  div.appendChild(msg);
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setStatus(text, state) {
+  statusText.textContent = text;
+  dotEl.className = 'dot';
+  if (state) dotEl.classList.add(state);
+}
+
+function setProgress(pct) {
+  progressBar.classList.add('active');
+  progressFill.style.width = pct + '%';
+}
+function hideProgress() {
+  progressBar.classList.remove('active');
+}
+
+// ─── 缩略图 ───
+function showThumbnail(screenshotBase64, name, width, height) {
+  thumbnailImg.src = 'data:image/png;base64,' + screenshotBase64;
+  thumbnailImg.style.display = 'block';
+  thumbnailPlaceholder.style.display = 'none';
+  thumbnailLabel.textContent = name + ' (' + width + 'x' + height + ')';
+  thumbnailContainer.classList.add('visible');
+}
+
+function hideThumbnail() {
+  thumbnailImg.style.display = 'none';
+  thumbnailPlaceholder.style.display = 'flex';
+  thumbnailLabel.textContent = '';
+  thumbnailContainer.classList.remove('visible');
+}
+
+// ─── 子节点预览 ───
+function showSubnodePreview(screenshot, name, w, h) {
+  thumbnailImg.src = 'data:image/png;base64,' + screenshot;
+  thumbnailImg.style.display = 'block';
+  thumbnailPlaceholder.style.display = 'none';
+  thumbnailLabel.textContent = name + ' (' + w + 'x' + h + ')';
+  thumbnailContainer.classList.add('visible');
+}
+
+function hideSubnodePreview() {
+  thumbnailImg.style.display = 'none';
+  thumbnailPlaceholder.style.display = 'none';
+  thumbnailLabel.textContent = '';
+  thumbnailContainer.classList.remove('visible');
+}
+
+// ─── 服务端探活 ───
+async function pingServer() {
+  try {
+    var res = await fetch(SERVER_URL + '/health', { cache: 'no-store' });
+    if (res.ok) {
+      if (!serverOnline) {
+        serverOnline = true;
+        setStatus('服务器已连接', 'connected');
+        log('桥服务器已连接', 'ok');
+        // 重连后重新上报当前选中节点
+        if (selectedNodeInfo.selected) {
+          _postSelectionToServer(selectedNodeInfo);
+        }
+      }
+      return true;
+    }
+    throw new Error('bad status');
+  } catch (e) {
+    if (serverOnline) {
+      serverOnline = false;
+      setStatus('服务器未连接', 'error');
+      log('桥服务器断开', 'error');
+    }
+    return false;
+  }
+}
+
+// ─── 轮询 server pending ───
+var pollTimer = null;
+var lastPendingCheck = false; // 上次 pending 状态，避免重复触发
+
+async function checkPending() {
+  if (!serverOnline) return;
+
+  try {
+    var res = await fetch(SERVER_URL + '/api/pending?build=' + encodeURIComponent(PLUGIN_BUILD),
+                          { cache: 'no-store' });
+    if (!res.ok) return;
+    var data = await res.json();
+    var isPending = data.pending === true;
+
+    // pending 从 false 变为 true → 触发提取/遍历
+    if (isPending && !lastPendingCheck) {
+      if (data.nodeId === '__list_all__') {
+        // 特殊 nodeId → 遍历所有画板（由 request-list 触发）
+        log('收到遍历画板请求', 'info');
+        setStatus('正在遍历所有画板...', 'busy');
+        parent.postMessage({ pluginMessage: { type: 'list-artboards' } }, '*');
+      } else if (data.nodeId) {
+        // extract-by-id: 按指定 nodeId 提取，不依赖当前选中
+        log('收到按 ID 提取请求: ' + data.nodeId, 'info');
+        setStatus('正在提取 (by ID)...', 'busy');
+        parent.postMessage({ pluginMessage: { type: 'extract-by-id', nodeId: data.nodeId } }, '*');
+      } else {
+        log('收到提取请求，正在提取设计数据...', 'info');
+        setStatus('正在提取数据...', 'busy');
+        parent.postMessage({ pluginMessage: { type: 'trigger-extract' } }, '*');
+      }
+    }
+
+    lastPendingCheck = isPending;
+
+  } catch (e) {
+    // 静默失败
+  }
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(function() {
+    pingServer().then(function(online) {
+      if (online) checkPending();
+    });
+  }, PENDING_POLL_MS);
+}
+
+// ─── 发送数据到 server（自动处理合并切图组） ───
+async function sendToServer(payload) {
+  if (sending) return;
+  sending = true;
+
+  log('发送节点树 (' + payload.name + ', ' + payload.width + 'x' + payload.height + ')...', 'info');
+  setStatus('正在发送数据...', 'busy');
+  setProgress(30);
+
+  try {
+    // 预处理合并切图组：Canvas 合成为单张 base64，替换 payload 中的 images
+    var images = payload.images || [];
+    var stitchedImages = [];
+    for (var i = 0; i < images.length; i++) {
+      var img = images[i];
+      if (img.isMergedGroup && img.childImages && img.childImages.length > 0) {
+        log('合成合并切图: ' + img.childImages.length + ' 张图...', 'info');
+        var stitched = await stitchToCanvas(img.childImages, { canvasW: img.canvasW, canvasH: img.canvasH, clipRectPx: img.clipRectPx });
+        if (stitched) {
+          stitchedImages.push({ id: img.id, name: img.name, data: stitched });
+        }
+      } else {
+        stitchedImages.push(img);
+      }
+    }
+    payload.images = stitchedImages;
+    payload.imageCount = stitchedImages.length;
+
+    var treeResp = await fetch(SERVER_URL + '/api/composition', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!treeResp.ok) throw new Error('服务端返回 ' + treeResp.status);
+    log('节点树发送成功', 'ok');
+    setProgress(60);
+
+    // 上传切图
+    if (stitchedImages.length > 0) {
+      log('上传 ' + stitchedImages.length + ' 张切图...', 'info');
+      setProgress(80);
+      function chunk(arr, size) {
+        var out = [];
+        for (var i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+        return out;
+      }
+      var batches = chunk(stitchedImages, 20);
+      for (var ib = 0; ib < batches.length; ib++) {
+        var batch = batches[ib];
+        var assetResp = await fetch(SERVER_URL + '/api/assets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ images: batch })
+        });
+        if (!assetResp.ok) log('切图上传失败 (批次' + (ib+1) + ')', 'error');
+        else log('切图批次 ' + (ib+1) + '/' + batches.length + ' 上传成功', 'ok');
+      }
+    }
+
+    setProgress(100);
+    hideProgress();
+    log('全部完成!', 'ok');
+    setStatus('完成: ' + payload.name, 'connected');
+
+    lastPendingCheck = false;
+    _exportInProgress = false;
+
+  } catch (e) {
+    log('发送失败: ' + (e.message || String(e)), 'error');
+    setStatus('发送失败', 'error');
+    hideProgress();
+    _exportInProgress = false;
+  }
+
+  sending = false;
+}
+
+// ─── 复制蓝色卡片中展示的全部节点 ───
+function copyNodePng() {
+  if (!selectedNodeInfo.selected) return;
+  var copyText = '';
+  if (selectedNodeInfo.count > 1 && selectedNodeInfo.allNodes && selectedNodeInfo.allNodes.length > 1) {
+    copyText = selectedNodeInfo.allNodes.map(function(n) {
+      return '节点: ' + n.name + '[' + n.id + ']';
+    }).join(' 、 ');
+  } else {
+    copyText = '节点: ' + selectedNodeInfo.name + '[' + selectedNodeInfo.id + ']';
+  }
+  try {
+    var ta = document.createElement('textarea');
+    ta.value = copyText;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    var cnt = selectedNodeInfo.count > 1 ? selectedNodeInfo.allNodes.length : 1;
+    log('已复制' + (cnt > 1 ? ': ' + cnt + ' 个节点' : ': ' + copyText), 'ok');
+    var toast = document.getElementById('copy-toast');
+    if (toast) {
+      toast.style.display = 'block';
+      setTimeout(function() { toast.style.display = 'none'; }, 1500);
+    }
+  } catch(e) {
+    log('复制失败', 'error');
+  }
+}
+
+// ─── Android Shape 代码展示 / 复制 ───
+function showShapeCode(code, kind) {
+  _currentShapeCode = code || '';
+  if (!_currentShapeCode) {
+    shapeCodeSection.classList.remove('visible');
+    shapeCodeEl.textContent = '';
+    return;
+  }
+  document.getElementById('shape-code-title').textContent =
+    kind === 'text' ? 'Android TextView' : (kind === 'shape' ? 'Android Shape' : 'Android 代码');
+  shapeCodeEl.textContent = _currentShapeCode;
+  shapeCodeSection.classList.add('visible');
+}
+
+function copyShapeCode() {
+  if (!_currentShapeCode) return;
+  try {
+    var ta = document.createElement('textarea');
+    ta.value = _currentShapeCode;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    log('已复制 Android Shape 代码', 'ok');
+    var toast = document.getElementById('shape-copy-toast');
+    var label = document.getElementById('shape-copy-label');
+    if (toast) {
+      toast.style.display = 'inline';
+      if (label) label.style.display = 'none';
+      setTimeout(function() {
+        toast.style.display = 'none';
+        if (label) label.style.display = '';
+      }, 1500);
+    }
+  } catch(e) {
+    log('复制失败', 'error');
+  }
+}
+
+// ─── 导出选中节点为切图（下载） ───
+function exportSelectedNode() {
+  if (!selectedNodeInfo.selected || _exportInProgress) return;
+  _exportInProgress = true;
+  _downloadQueue = [];
+  if (selectedNodeInfo.inMergeGroup && selectedNodeInfo.mergeMembers && selectedNodeInfo.mergeMembers.length > 1) {
+    _mergeDownloadMode = true;
+    parent.postMessage({ pluginMessage: { type: 'get-merge-preview', nodeIds: selectedNodeInfo.mergeMembers } }, '*');
+  } else {
+    parent.postMessage({ pluginMessage: { type: 'export-selected-node' } }, '*');
+  }
+}
+
+function handleNodeExport(result) {
+  if (!result || !result.data) {
+    log('导出失败', 'error');
+    return;
+  }
+  _downloadQueue.push(result);
+  log('已加入打包队列 (' + _downloadQueue.length + '): ' + (result.name || '未知'), 'info');
+}
+
+// ─── ZIP 打包下载（纯 JS，无外部依赖） ───
+var CRC32_TABLE = (function() {
+  var t = new Int32Array(256);
+  for (var i = 0; i < 256; i++) {
+    var c = i;
+    for (var j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[i] = c;
+  }
+  return t;
+})();
+
+function crc32(data) {
+  var crc = 0xFFFFFFFF;
+  for (var i = 0; i < data.length; i++) crc = (CRC32_TABLE[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8));
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function dosDateTime() {
+  var d = new Date();
+  return (d.getFullYear() - 1980) << 25 | (d.getMonth() + 1) << 21 | d.getDate() << 16
+    | d.getHours() << 11 | d.getMinutes() << 5 | (d.getSeconds() >> 1);
+}
+
+function packZip(files) {
+  // files: [{name: string, data: Uint8Array}]
+  var localHeaders = [];
+  var centralHeaders = [];
+  var offset = 0;
+
+  for (var fi = 0; fi < files.length; fi++) {
+    var nameBytes = new TextEncoder().encode(files[fi].name);
+    var data = files[fi].data;
+    var crc = crc32(data);
+    var dosTime = dosDateTime();
+
+    // Local file header
+    var lh = new ArrayBuffer(30 + nameBytes.length);
+    var lv = new DataView(lh);
+    lv.setUint32(0, 0x04034b50, true);  // signature
+    lv.setUint16(4, 20, true);           // version needed
+    lv.setUint16(6, 0x0800, true);       // bit flag: UTF-8
+    lv.setUint16(8, 0, true);            // compression: stored
+    lv.setUint16(10, dosTime & 0xFFFF, true);
+    lv.setUint16(12, (dosTime >> 16) & 0xFFFF, true);
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, data.length, true); // compressed size
+    lv.setUint32(22, data.length, true); // uncompressed size
+    lv.setUint16(26, nameBytes.length, true);
+    lv.setUint16(28, 0, true);           // extra field length
+    var lhBytes = new Uint8Array(lh);
+    lhBytes.set(nameBytes, 30);
+    localHeaders.push(lhBytes);
+
+    // Central directory entry
+    var cd = new ArrayBuffer(46 + nameBytes.length);
+    var cv = new DataView(cd);
+    cv.setUint32(0, 0x02014b50, true);   // signature
+    cv.setUint16(4, 20, true);           // version made by
+    cv.setUint16(6, 20, true);           // version needed
+    cv.setUint16(8, 0x0800, true);       // bit flag: UTF-8
+    cv.setUint16(10, 0, true);           // compression
+    cv.setUint16(12, dosTime & 0xFFFF, true);
+    cv.setUint16(14, (dosTime >> 16) & 0xFFFF, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, data.length, true);
+    cv.setUint32(24, data.length, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint16(30, 0, true);           // extra field length
+    cv.setUint16(32, 0, true);           // file comment length
+    cv.setUint16(34, 0, true);           // disk number start
+    cv.setUint16(36, 0, true);           // internal file attributes
+    cv.setUint32(38, 0, true);           // external file attributes
+    cv.setUint32(42, offset, true);      // local header offset
+    var cdBytes = new Uint8Array(cd);
+    cdBytes.set(nameBytes, 46);
+    centralHeaders.push(cdBytes);
+
+    offset += 30 + nameBytes.length + data.length;
+  }
+
+  // Calculate total size
+  var totalSize = 0;
+  var parts = [];
+  for (var pi = 0; pi < files.length; pi++) {
+    parts.push(localHeaders[pi]);
+    parts.push(files[pi].data);
+    totalSize += localHeaders[pi].length + files[pi].data.length;
+  }
+  var cdOffset = totalSize;
+  var cdSize = 0;
+  for (var ci = 0; ci < centralHeaders.length; ci++) {
+    parts.push(centralHeaders[ci]);
+    cdSize += centralHeaders[ci].length;
+  }
+
+  // EOCD
+  var eocd = new ArrayBuffer(22);
+  var ev = new DataView(eocd);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(4, 0, true);
+  ev.setUint16(6, 0, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, cdOffset, true);
+  ev.setUint16(20, 0, true);
+  parts.push(new Uint8Array(eocd));
+  totalSize += cdSize + 22;
+
+  // Build final blob
+  var result = new Uint8Array(totalSize);
+  var pos = 0;
+  for (var ri = 0; ri < parts.length; ri++) {
+    result.set(parts[ri], pos);
+    pos += parts[ri].length;
+  }
+  return result;
+}
+
+function buildZipAndDownload(items) {
+  var files = [];
+  var usedNames = {};
+  for (var i = 0; i < items.length; i++) {
+    var name = (items[i].name || 'export_' + (i + 1)) + '.png';
+    // Deduplicate names
+    if (usedNames[name]) {
+      var base = name.replace(/\.png$/, '');
+      var c = 2;
+      while (usedNames[base + '_' + c + '.png']) c++;
+      name = base + '_' + c + '.png';
+    }
+    usedNames[name] = true;
+    // Decode base64
+    var binStr = atob(items[i].data);
+    var bytes = new Uint8Array(binStr.length);
+    for (var b = 0; b < binStr.length; b++) bytes[b] = binStr.charCodeAt(b);
+    files.push({ name: name, data: bytes });
+  }
+
+  log('正在打包 ' + files.length + ' 个文件为 ZIP...', 'info');
+  var zipData = packZip(files);
+
+  var dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  var zipName = '切图_' + dateStr + '.zip';
+
+  var blob = new Blob([zipData], { type: 'application/zip' });
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement('a');
+  link.href = url;
+  link.download = zipName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  // Delay revoke to ensure download starts
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+
+  _exportInProgress = false;
+  log('↓ 下载: ' + zipName + ' (' + files.length + ' 张切图)', 'ok');
+}
+
+function downloadPng(b64, name) {
+  var link = document.createElement('a');
+  link.href = 'data:image/png;base64,' + b64;
+  link.download = name + '.png';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// ─── 合并预览（标记后预览 / 下载模式时直接存） ───
+function handleMergePreview(msg) {
+  if (!msg.nodeImages || msg.nodeImages.length === 0) {
+    if (_mergeDownloadMode) {
+      _mergeDownloadMode = false;
+      _exportInProgress = false;
+      log('合并导出: 无可用节点', 'error');
+    }
+    return;
+  }
+  // 预览/下载展示的是裁剪到画板后的结果，尺寸用 clipRectPx；未裁剪时用并集尺寸
+  var previewW = (msg.clipRectPx && msg.clipRectPx.w) ? Math.round(msg.clipRectPx.w) : Math.round(msg.mergeW);
+  var previewH = (msg.clipRectPx && msg.clipRectPx.h) ? Math.round(msg.clipRectPx.h) : Math.round(msg.mergeH);
+  stitchToCanvas(msg.nodeImages, { canvasW: msg.canvasW, canvasH: msg.canvasH, clipRectPx: msg.clipRectPx }).then(function(mergedB64) {
+    if (!mergedB64) {
+      if (_mergeDownloadMode) {
+        _mergeDownloadMode = false;
+        _exportInProgress = false;
+      }
+      log('合并导出: 合成失败', 'error');
+      return;
+    }
+    if (_mergeDownloadMode) {
+      _mergeDownloadMode = false;
+      _exportInProgress = false;
+      var dateStr = new Date().toISOString().slice(0, 10);
+      downloadPng(mergedB64, '合并切图_' + dateStr);
+      log('↓ 下载: 合并切图_' + dateStr + '.png', 'ok');
+    } else {
+      showSubnodePreview(mergedB64, '合并切图', previewW, previewH);
+      log('合并预览: ' + msg.nodeCount + ' 个节点', 'ok');
+    }
+  });
+}
+
+// ─── 通用 Canvas 合成：多张 PNG → 一张 base64 ───
+// 采用"先加载测尺寸、后绘制、再裁剪"：
+//   1. 先加载全部成员 PNG，用实际像素（naturalWidth/Height）计算内容包围盒。
+//      不能只用节点 bounds（opts.canvasW/canvasH）开 canvas——文本节点导出 PNG
+//      的实际宽度可能大于 node.width×scale（文字渲染溢出文本框），canvas 按 bounds
+//      开得不够宽时右侧内容会被裁掉。
+//   2. canvas 尺寸 = max(传入基准尺寸, 实际内容包围盒)，然后按 offsetX/offsetY
+//      （相对 canvas 原点）全量绘制，允许负偏移/溢出。
+//   3. 若传 opts.clipRectPx，最终只截取该区域（相对 canvas 原点）——溢出部分自然裁掉。
+// 几何正确性只依赖成员绝对坐标，与父容器是否 clipsContent / 有无缩放无关。
+// resolve(base64)：PNG data（裁剪到 clipRect 后，若传了 clipRectPx）。
+// 预览尺寸由调用方从 opts.clipRectPx 推导，不依赖 resolve 多参。
+function stitchToCanvas(nodeImages, opts) {
+  opts = opts || {};
+  return new Promise(function(resolve) {
+    var minX = 0, minY = 0, baseCW, baseCH;
+    if (opts.canvasW && opts.canvasH) {
+      baseCW = opts.canvasW;
+      baseCH = opts.canvasH;
+    } else {
+      var maxX = -Infinity, maxY = -Infinity;
+      minX = Infinity; minY = Infinity;
+      for (var i = 0; i < nodeImages.length; i++) {
+        minX = Math.min(minX, nodeImages[i].offsetX);
+        minY = Math.min(minY, nodeImages[i].offsetY);
+        maxX = Math.max(maxX, nodeImages[i].offsetX + nodeImages[i].w);
+        maxY = Math.max(maxY, nodeImages[i].offsetY + nodeImages[i].h);
+      }
+      baseCW = Math.ceil(maxX - minX);
+      baseCH = Math.ceil(maxY - minY);
+    }
+
+    var loaded = 0;
+    var total = nodeImages.length;
+    var hasError = false;
+    var loadedImages = [];
+    // 实际内容包围盒（相对 minX/minY，用 PNG 实际像素）
+    var contentMaxX = 0, contentMaxY = 0;
+
+    var finish = function() {
+      if (loaded < total) return;
+      if (hasError) { resolve(null); return; }
+      // canvas 尺寸必须容纳每个成员 PNG 的实际像素范围（文本节点可能溢出节点 bounds）。
+      // 只扩不减：普通节点 naturalWidth = node.width×scale，canvas 保持基准尺寸，行为不变。
+      var cw = Math.max(baseCW, Math.ceil(contentMaxX));
+      var ch = Math.max(baseCH, Math.ceil(contentMaxY));
+      var canvas = document.createElement('canvas');
+      canvas.width = cw || 1;
+      canvas.height = ch || 1;
+      var ctx = canvas.getContext('2d');
+      for (var k = 0; k < loadedImages.length; k++) {
+        var li = loadedImages[k];
+        var dw = li.naturalW || li.info.w;
+        var dh = li.naturalH || li.info.h;
+        ctx.drawImage(li.img, li.info.offsetX - minX, li.info.offsetY - minY, dw, dh);
+      }
+      var clip = opts.clipRectPx;
+      if (clip && clip.w > 0 && clip.h > 0) {
+        // 截取 clipRect 与 canvas 的交集区域
+        // 输出 canvas 只保留实际绘制的内容，不被 clipRect 撑大
+        var sx = Math.max(0, clip.x);
+        var sy = Math.max(0, clip.y);
+        var sw = Math.min(clip.w, cw - sx);
+        var sh = Math.min(clip.h, ch - sy);
+        if (sw > 0 && sh > 0) {
+          var outC = document.createElement('canvas');
+          outC.width = sw;
+          outC.height = sh;
+          var octx = outC.getContext('2d');
+          try {
+            octx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+          } catch(e) {
+            console.error('[stitch] clip drawImage error:', e);
+          }
+          canvas = outC;
+        } else {
+          resolve(null);
+          return;
+        }
+      }
+      var result = canvas.toDataURL('image/png').split(',')[1];
+      resolve(result);
+    };
+
+    for (var j = 0; j < total; j++) {
+      (function(imgInfo, idx) {
+        var img = new Image();
+        img.onload = function() {
+          try {
+            // 用 PNG 实际像素尺寸绘制：文本节点的 node.width/height 含尾随空行/行盒
+            // padding，与 exportAsync 实际 PNG 像素不符，按 w/h 强制绘制会拉伸文字。
+            // 普通节点 naturalWidth = w，无影响。
+            var dw = img.naturalWidth || imgInfo.w;
+            var dh = img.naturalHeight || imgInfo.h;
+            var right = (imgInfo.offsetX - minX) + dw;
+            var bottom = (imgInfo.offsetY - minY) + dh;
+            if (right > contentMaxX) contentMaxX = right;
+            if (bottom > contentMaxY) contentMaxY = bottom;
+            loadedImages.push({ img: img, info: imgInfo, naturalW: dw, naturalH: dh });
+          } catch(e) {
+            console.error('[stitch] image calc error:', e, imgInfo);
+          }
+          loaded++;
+          finish();
+        };
+        img.onerror = function(e) {
+          console.error('[stitch] image load error at index', idx, 'data length:', (imgInfo.data || '').length);
+          loaded++;
+          hasError = true;
+          finish();
+        };
+        img.src = 'data:image/png;base64,' + imgInfo.data;
+      })(nodeImages[j], j);
+    }
+  });
+}
+
+// ─── 上报选中节点到桥服务器 ───
+function _postSelectionToServer(info) {
+  if (!serverOnline) return;
+  var payload = { selected: true, name: info.name, id: info.id,
+    type: info.nodeType, pageName: info.pageName,
+    parentName: info.parentName || '', parentId: info.parentId || '',
+    rootArtboardName: info.rootArtboardName || '', rootArtboardId: info.rootArtboardId || '',
+    fileName: info.fileName || '', isMarked: info.isMarked || false };
+  fetch(SERVER_URL + '/api/selected-node', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).catch(function() {});
+}
+
+function reportSelection(info) {
+  try {
+    selectedNodeInfo = info;
+    if (info.selected) {
+      // Android 代码区（画板分支提前 return，需先处理）
+      showShapeCode(info.shapeCode || '', info.codeKind);
+      // 顶级画板（无 parentName）→ 不展示操作按钮，但显示重新提取
+      if (info.nodeType === 'FRAME' || info.nodeType === 'COMPONENT' || info.nodeType === 'COMPONENT_SET') {
+        if (!info.parentName) {
+          var display = '节点: ' + info.name + ' (' + info.nodeType + ')  [' + info.id + ']';
+          document.getElementById('selected-node-text').textContent = display;
+          selectedNodeEl.style.display = 'block';
+          selectedNodeEl.style.whiteSpace = 'normal';
+          document.getElementById('selection-info-text').textContent = '画板';
+          document.getElementById('btn-re-extract').style.display = '';
+          actionBar.classList.remove('visible');
+          document.getElementById('mark-status').style.display = 'none';
+          _postSelectionToServer(info);
+          return;
+        }
+        // 嵌套 Frame/Component → 当作子节点展示操作按钮，走下方逻辑
+      }
+      // 子节点（可能多选） → 显示卡片列表 + 操作按钮
+      if (info.count > 1 && info.allNodes && info.allNodes.length > 1) {
+        // 多选模式：全部列出来
+        var html = '';
+        if (info.inMergeGroup) {
+          html += '<div class="multi-node-merged-hint">[合并切图 ' + (info.mergeMembers ? info.mergeMembers.length : '?') + ' 个成员]</div>';
+        }
+        for (var i = 0; i < info.allNodes.length; i++) {
+          var n = info.allNodes[i];
+          var markBadge = n.isMarked ? ' [🔖]' : '';
+          html += '<div class="multi-node-item" data-idx="' + i + '" onclick="copyNodeNId(' + i + ', event)">';
+          html += '  <span class="multi-node-name">节点: ' + n.name + ' (' + n.type + ')  [' + n.id + ']' + markBadge + '</span>';
+          html += '  <span class="copy-label">复制</span>';
+          html += '</div>';
+        }
+        if (info.parentName) {
+          html = '<div class="multi-node-parent">画板: ' + info.parentName + '</div>' + html;
+        }
+        document.getElementById('selected-node-text').innerHTML = html;
+        selectedNodeEl.style.display = 'block';
+        selectedNodeEl.style.whiteSpace = 'normal';
+        selectedNodeEl.style.cursor = 'default';
+        document.getElementById('selection-info-text').textContent = info.inMergeGroup ? '[合并切图组]' : ('[多选 ' + info.count + ' 个节点]');
+        document.getElementById('btn-re-extract').style.display = 'none';
+        actionBar.classList.add('visible');
+      } else {
+        // 单选子节点 → 显示完整层级 (blue box) + 操作按钮
+        var display = '节点: ' + info.name + ' (' + info.nodeType + ')  [' + info.id + ']';
+        if (info.parentName) {
+          display += '\n   |_ 画板: ' + info.parentName;
+        }
+        document.getElementById('selected-node-text').textContent = display;
+        selectedNodeEl.style.display = 'block';
+        selectedNodeEl.style.whiteSpace = 'pre-line';
+        document.getElementById('selection-info-text').textContent = '[子节点选中]';
+        document.getElementById('btn-re-extract').style.display = 'none';
+        actionBar.classList.add('visible');
+      }
+      // 标记切图按钮状态
+      var markBtn = document.getElementById('btn-mark');
+      var unmarkBtn = document.getElementById('btn-unmark');
+      var markStatus = document.getElementById('mark-status');
+      if (markBtn && unmarkBtn) {
+        if (info.inMergeGroup) {
+          markBtn.style.display = 'none';
+          unmarkBtn.style.display = '';
+          unmarkBtn.textContent = '取消合并(' + (info.mergeMembers ? info.mergeMembers.length : '?') + ')';
+        } else {
+          markBtn.style.display = info.isMarked ? 'none' : '';
+          unmarkBtn.style.display = info.isMarked ? '' : 'none';
+          unmarkBtn.textContent = '取消标记';
+        }
+      }
+      if (markStatus) {
+        if (info.inMergeGroup) {
+          markStatus.style.display = 'block';
+          markStatus.textContent = '[合并切图 ' + (info.mergeMembers ? info.mergeMembers.length : '?') + ' 个成员]';
+        } else if (info.isMarked) {
+          markStatus.style.display = 'block';
+          markStatus.textContent = '已标记为切图';
+        } else {
+          markStatus.style.display = 'none';
+        }
+      }
+      // 下载按钮
+      var downloadBtn = document.getElementById('btn-export');
+      if (downloadBtn) {
+        downloadBtn.style.display = info.exportable === false ? 'none' : '';
+        if (info.inMergeGroup) {
+          downloadBtn.textContent = '下载合并图';
+        } else if (info.count > 1) {
+          downloadBtn.textContent = '打包下载';
+        } else {
+          downloadBtn.textContent = '下载';
+        }
+      }
+      if (!info.exportable) {
+        hideSubnodePreview();
+      }
+      // 非多选时隐藏多节点预览列表
+      if (info.count <= 1) {
+        hideMultiNodePreviews();
+      }
+      // 上报到 server
+      _postSelectionToServer(info);
+    } else {
+      document.getElementById('btn-re-extract').style.display = 'none';
+      selectedNodeEl.style.display = 'none';
+      document.getElementById('selected-node-text').textContent = '';
+      document.getElementById('selection-info-text').textContent = '未选中节点';
+      selInfo.style.cursor = 'default';
+      actionBar.classList.remove('visible');
+      document.getElementById('mark-status').style.display = 'none';
+      hideSubnodePreview();
+      showShapeCode('');
+      selectedNodeInfo = {};
+    }
+
+    // 有选中内容时恢复手型
+    if (info.selected) {
+      selInfo.style.cursor = 'pointer';
+    }
+  } catch(e) {}
+}
+
+// ─── 复制多选中的第 idx 个节点的 layername[nodeId] ───
+function copyNodeNId(idx, ev) {
+  if (ev) ev.stopPropagation();
+  // 优先从多选预览数据获取
+  var n = (window._multiPreviewData && window._multiPreviewData[idx])
+    ? window._multiPreviewData[idx]
+    : (selectedNodeInfo.allNodes && selectedNodeInfo.allNodes[idx])
+      ? selectedNodeInfo.allNodes[idx]
+      : null;
+  if (!n) return;
+  var copyText = '节点: ' + n.name + '[' + n.id + ']';
+  try {
+    var ta = document.createElement('textarea');
+    ta.value = copyText;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    log('已复制: ' + copyText, 'ok');
+  } catch(e) {
+    log('复制失败', 'error');
+  }
+}
+
+// ─── 标记 / 取消标记切图 ───
+function markExport() {
+  if (!selectedNodeInfo.selected) return;
+  if (selectedNodeInfo.count > 1 && selectedNodeInfo.allNodes) {
+    var ids = selectedNodeInfo.allNodes.map(function(n) { return n.id; });
+    parent.postMessage({ pluginMessage: { type: 'mark-export', nodeIds: ids } }, '*');
+    log('已标记: ' + selectedNodeInfo.count + ' 个节点为合并切图', 'ok');
+  } else {
+    parent.postMessage({ pluginMessage: { type: 'mark-export', nodeId: selectedNodeInfo.id } }, '*');
+    log('已标记: ' + selectedNodeInfo.name, 'ok');
+  }
+}
+function unmarkExport() {
+  if (!selectedNodeInfo.selected) return;
+  if (selectedNodeInfo.inMergeGroup) {
+    var cnt = selectedNodeInfo.mergeMembers ? selectedNodeInfo.mergeMembers.length : '?';
+    if (confirm('确认取消该合并切图组（共 ' + cnt + ' 个成员）？')) {
+      parent.postMessage({ pluginMessage: {
+        type: 'unmark-merge-group',
+        parentId: selectedNodeInfo.mergeParentId,
+        mergeGroupId: selectedNodeInfo.mergeGroupId
+      }}, '*');
+      log('已取消合并组', 'ok');
+    }
+  } else {
+    parent.postMessage({ pluginMessage: { type: 'unmark-export', nodeId: selectedNodeInfo.id } }, '*');
+    log('已取消标记: ' + selectedNodeInfo.name, 'ok');
+  }
+}
+
+function reExtract() {
+  if (!selectedNodeInfo.selected || !selectedNodeInfo.rootArtboardId) return;
+  if (_exportInProgress) { log('提取进行中，请稍候...', 'info'); return; }
+  _exportInProgress = true;
+  log('触发重新提取: ' + selectedNodeInfo.rootArtboardId, 'info');
+  parent.postMessage({ pluginMessage: { type: 're-extract', nodeId: selectedNodeInfo.rootArtboardId } }, '*');
+}
+
+// ─── 多节点预览列表（可折叠） ───
+function showMultiNodePreviews(previews) {
+  if (!previews || previews.length === 0) {
+    hideMultiNodePreviews();
+    return;
+  }
+  var section = document.getElementById('multi-preview-section');
+  var list = document.getElementById('multi-preview-list');
+  var count = document.getElementById('multi-preview-count');
+  var toggle = document.getElementById('multi-preview-toggle');
+
+  count.textContent = previews.length;
+  var html = '';
+  for (var i = 0; i < previews.length; i++) {
+    var p = previews[i];
+    var imgTag = p.screenshot
+      ? '<img class="preview-thumb" src="data:image/png;base64,' + p.screenshot + '" alt="' + escHtml(p.name) + '" />'
+      : '<div class="preview-thumb" style="display:flex;align-items:center;justify-content:center;color:#ccc;font-size:9px;">N/A</div>';
+    html += '<div class="multi-preview-item" onclick="copyNodeNId(' + i + ', event)" title="点击复制: ' + escHtml(p.name) + '[' + p.id + ']">';
+    html += '  ' + imgTag;
+    html += '  <div class="preview-info">';
+    html += '    <div class="preview-name">' + escHtml(p.name) + '</div>';
+    html += '    <div class="preview-meta">' + p.type + ' / ' + p.width + '×' + p.height + ' / ' + (p.id || '').substring(0, 12) + '…' + '</div>';
+    html += '  </div>';
+    html += '  <span class="preview-copy">复制</span>';
+    html += '</div>';
+  }
+  list.innerHTML = html;
+  section.classList.add('visible');
+  _multiPreviewExpanded = true;
+  list.classList.remove('collapsed');
+  toggle.textContent = '▼ 展开';
+  
+  // 缓存多选预览数据供 copyNodeNId 使用
+  window._multiPreviewData = previews;
+}
+
+function hideMultiNodePreviews() {
+  var section = document.getElementById('multi-preview-section');
+  if (section) section.classList.remove('visible');
+  window._multiPreviewData = null;
+}
+
+function toggleMultiPreview() {
+  var list = document.getElementById('multi-preview-list');
+  var toggle = document.getElementById('multi-preview-toggle');
+  _multiPreviewExpanded = !_multiPreviewExpanded;
+  if (_multiPreviewExpanded) {
+    list.classList.remove('collapsed');
+    toggle.textContent = '▼ 展开';
+  } else {
+    list.classList.add('collapsed');
+    toggle.textContent = '▶ 折叠';
+  }
+}
+
+function escHtml(str) {
+  var d = document.createElement('div');
+  d.appendChild(document.createTextNode(str || ''));
+  return d.innerHTML;
+}
+
+function closePlugin() {
+  if (pollTimer) clearInterval(pollTimer);
+  parent.postMessage({ pluginMessage: { type: 'close' } }, '*');
+}
+
+// ─── 接收插件消息 ───
+window.onmessage = function(event) {
+  var msg = event.data && event.data.pluginMessage;
+  if (!msg) return;
+
+  switch (msg.type) {
+
+    case 'selection-info':
+      reportSelection(msg);
+      break;
+
+    case 'subnode-preview':
+      if (msg.clear) {
+        hideSubnodePreview();
+      } else if (msg.screenshot) {
+        showSubnodePreview(msg.screenshot, msg.name, msg.width, msg.height);
+      }
+      break;
+
+    case 'thumbnail':
+      if (msg.text) {
+        document.getElementById('selection-info-text').textContent = msg.text;
+      }
+      if (msg.clear) {
+        hideThumbnail();
+      } else if (msg.screenshot) {
+        showThumbnail(msg.screenshot, msg.name, msg.width, msg.height);
+      }
+      // msg.text 可能是"正在生成预览..."中间状态，不清除已有缩略图
+      break;
+
+    case 'status':
+      log(msg.text, 'info');
+      setStatus(msg.text, 'busy');
+      break;
+
+    case 'composition-ready':
+      // 数据就绪 → 发送到 server（必须 await 等待合并切图异步合成）
+      log('数据就绪: ' + msg.payload.name, 'ok');
+      (async function() {
+        try {
+          await sendToServer(msg.payload);
+        } catch(e) {
+          log('发送失败: ' + (e.message || String(e)), 'error');
+          setStatus('发送失败', 'error');
+        }
+      })();
+      break;
+
+    case 'extract-error':
+      log(msg.text, 'error');
+      setStatus(msg.text, 'error');
+      // 重置 pending 状态，防止卡死；同时回填错误文本给服务器，供 Agent 诊断
+      lastPendingCheck = false;
+      try {
+        fetch(SERVER_URL + '/api/clear-pending', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: String(msg.text || '提取失败') })
+        }).catch(function(){});
+      } catch(e) {}
+      break;
+
+    case 'multi-node-previews':
+      showMultiNodePreviews(msg.previews);
+      break;
+
+    case 'node-export:single-result':
+      _exportInProgress = false;
+      if (msg.data) {
+        downloadPng(msg.data, msg.name);
+        log('↓ 下载: ' + msg.name + '.png', 'ok');
+      } else {
+        log('导出失败: 无数据', 'error');
+      }
+      break;
+
+    case 'node-export:result':
+      handleNodeExport(msg);
+      break;
+
+    case 'merge-preview':
+      handleMergePreview(msg);
+      break;
+
+    case 'node-export:complete':
+      if (msg.exported > 0) {
+        log('导出完成: ' + msg.exported + ' 个节点', 'ok');
+        if (msg.failed > 0) {
+          log(msg.failed + ' 个节点导出失败', 'error');
+        }
+        if (_downloadQueue.length > 0) {
+          buildZipAndDownload(_downloadQueue);
+        } else {
+          _exportInProgress = false;
+          log('无可用切图数据', 'error');
+        }
+      } else {
+        _exportInProgress = false;
+        log('导出失败: 所有节点均导出失败', 'error');
+      }
+      break;
+
+    case 'node-export:error':
+      _exportInProgress = false;
+      log('导出失败: ' + (msg.text || '未知错误'), 'error');
+      break;
+
+    case 'error':
+      log(msg.text, 'error');
+      setStatus(msg.text, 'error');
+      break;
+
+    case 'artboard-list':
+      log('遍历完成: ' + msg.total + ' 个画板', 'ok');
+      setStatus('已就绪 (' + msg.total + ' 个画板)', 'connected');
+      lastPendingCheck = false;
+      // 发送到桥服务器
+      fetch(SERVER_URL + '/api/artboard-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artboards: msg.artboards, total: msg.total })
+      }).catch(function(){});
+      break;
+
+    case 'artboard-list-error':
+      log(msg.text, 'error');
+      setStatus('遍历失败', 'error');
+      lastPendingCheck = false;
+      fetch(SERVER_URL + '/api/artboard-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: String(msg.text || '遍历失败') })
+      }).catch(function(){});
+      break;
+  }
+};
+
+// ─── 初始化 ───
+pingServer().then(function(online) {
+  if (!online) {
+    setStatus('服务器未连接 (localhost:7789)', 'error');
+    log('等待桥服务器启动...', 'info');
+  }
+});
+startPolling();
+setInterval(pingServer, 10000); // 每 10 秒探活
+log('插件已加载 (pull 模式)', 'ok');
+</script>
+</body>
+</html>

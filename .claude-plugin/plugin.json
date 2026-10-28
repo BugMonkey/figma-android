@@ -1,0 +1,9 @@
+{
+  "name": "figma-android",
+  "description": "Figma 设计稿转 Android Skill。通过本地 Figma 桥读取节点树、截图和切图，生成布局/页面，改造已有页面并做还原度检查。",
+  "version": "1.0.1021",
+  "author": {
+    "name": "Edison"
+  },
+  "license": "MIT"
+}

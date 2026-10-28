@@ -1,0 +1,80 @@
+{
+  "skill_name": "figma-android",
+  "description": "Figma 设计稿转 Android 代码（桥模式）评测",
+  "created": "2026-07-15",
+  "evals": [
+    {
+      "id": 0,
+      "name": "inspect",
+      "title": "查看画板",
+      "prompt": "帮我看看这个画板",
+      "expected_output": "输出画板结构分析：视觉区域划分、容器嵌套、元素归组、滚动策略、切图覆盖。使用 inspect 命令并通过 figma_selected_node.py + figma_query_node.py 查询节点信息。",
+      "files": [],
+      "assertions": [
+        {"text": "输出了画板的视觉区域划分", "category": "structure"},
+        {"text": "识别了主要容器及其嵌套关系", "category": "structure"},
+        {"text": "给出了滚动策略判断", "category": "analysis"},
+        {"text": "输出了切图节点信息（含切图文件名，取自工具箱输出而非手工解析 assets.json）", "category": "assets"},
+        {"text": "终端输出精简摘要（≤30 行，含复杂度与高风险信号），不产出独立落盘报告文件", "category": "format"},
+        {"text": "使用了脚本工具查询节点信息，而非手动解析 JSON", "category": "process"}
+      ]
+    },
+    {
+      "id": 1,
+      "name": "generate-page",
+      "title": "生成页面",
+      "prompt": "按这个设计稿生成首页页面",
+      "expected_output": "生成完整的 Android 页面：XML 布局 + Activity 骨架 + shape drawable + colors/dimens + 切图同步 + 编译验证通过。",
+      "files": [],
+      "assertions": [
+        {"text": "生成了至少一个 XML 布局文件", "category": "output"},
+        {"text": "布局文件使用了正确的 Android 命名空间", "category": "quality"},
+        {"text": "编译通过（./gradlew assembleDebug 成功）", "category": "verification"},
+        {"text": "没有对 android_tree.json 中的 dp 值做二次换算", "category": "quality"},
+        {"text": "生成了资源文件（colors.xml / dimens.xml / drawable）", "category": "output"},
+        {"text": "生成的 drawable 引用与命名规范一致", "category": "quality"},
+        {"text": "终端输出精简摘要（生成/修改的文件 + 风险点），不再生成 page_report.md", "category": "output"},
+        {"text": "向 figma_task_memory.md 按节追加任务记忆（append-only，固定 8 字段，build 与实际验证结果一致）", "category": "output"},
+        {"text": "生成了 Activity 或 Fragment 骨架代码", "category": "output"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "export-assets",
+      "title": "导出切图",
+      "prompt": "导出这个画板的所有切图",
+      "expected_output": "从缓存目录同步切图到 app 的 drawable-xxhdpi/，按资源命名规则重命名，终端输出命名映射与冲突处理；覆盖既有资源时向 figma_task_memory.md 追加任务记忆节（asset_overwrite 记回滚账本）。",
+      "files": [],
+      "assertions": [
+        {"text": "终端输出了命名映射与冲突处理结果；有覆盖既有资源时追加了任务记忆节且 asset_overwrite 非空", "category": "output"},
+        {"text": "切图文件被重命名为语义化名称", "category": "quality"},
+        {"text": "切图文件放置在 drawable-xxhdpi/ 目录中", "category": "output"},
+        {"text": "切图格式为 PNG", "category": "quality"},
+        {"text": "资源命名符合 resource-naming-rules.md 规范", "category": "quality"},
+        {"text": "终端的命名映射与已拷贝文件一一对应", "category": "verification"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "restyle-page",
+      "title": "按设计稿改版已有页面（多画板）",
+      "prompt": "我会给你4个页面的画板，画板底部会有对应tabfragment的选中样式；我需要你帮我更新首页底部四个按钮样式；这是一次页面改版，有不清楚的及时和我确认",
+      "expected_output": "结构确认阶段先用 figma_compare_nodes.py（--name 关键词 --fuzzy --root-ids 四板）一次得到各板对比表 + 差异摘要 + 内容等价分组，再按需 figma_query_node.py 下钻单节点取精确样式；切图判定看内容签名而非文件名；切图替换按 resource_impact=replace_asset 保留项目原文件名覆盖；页面归属靠 grep 证明（记忆节 attribution 字段 code_entry + host 证据）而非画板名；screenshot.png 仅作全貌预览或定性补位；影响分析进终端审批不落盘；figma_task_memory.md 按任务一节 append-only 追加（固定 8 字段，含 build/blocker/verified_scope/open；编译被非本次改动阻塞时为 PARTIAL，不得标 PASS）；开工前先 grep 历史记忆节。",
+      "files": [],
+      "assertions": [
+        {"text": "优先使用 figma_query_node.py / figma_selected_node.py --node-id 从 android_tree.json 获取目标区域（tab/图标）的内容与颜色，而非直接读截图", "category": "process"},
+        {"text": "多画板场景使用了 figma_compare_nodes.py（或 --root-id 逐板查询）对比选中态差异", "category": "process"},
+        {"text": "用到了工具箱输出的切图文件名（查询结果的「切图:」行或 --assets），未手工解析 assets.json 或自写 inline 脚本", "category": "process"},
+        {"text": "替换既有切图时保留项目原文件名覆盖（resource_impact=replace_asset），未按 Figma 导出名改名而打断 @drawable/ 引用", "category": "quality"},
+        {"text": "判断跨画板切图是否同一张时依据内容签名，未用 image.file 文件名不同推断视觉不同", "category": "quality"},
+        {"text": "未无故派子 agent 读图分析 android_tree 已能回答的图标内容与颜色", "category": "process"},
+        {"text": "输出的确认摘要以 android_tree 精确数据（name/style.background/border_color/text_color/切图文件名）为基础", "category": "structure"},
+        {"text": "开工前读取了任务记忆（grep '^## 任务' figma_task_memory.md），并消费 excluded/asset_overwrite/PARTIAL 补跑义务", "category": "process"},
+        {"text": "向 figma_task_memory.md 追加任务记忆节（append-only，节头含 任务名/画板 nodeId/日期，固定 8 字段），未整体覆盖", "category": "output"},
+        {"text": "记忆节 attribution 字段含 code_entry 与宿主证据（文件:行号 + 调用形式，grep 证明目标页被宿主引用），未靠画板名猜类名", "category": "quality"},
+        {"text": "记忆节含机器可检索字段 build/blocker/verified_scope/open；编译被非本次改动阻塞时标 PARTIAL 而非 PASS，且在 open 记录补跑义务", "category": "format"},
+        {"text": "未删除/重命名被代码引用的 ID，未修改业务逻辑", "category": "quality"}
+      ]
+    }
+  ]
+}
