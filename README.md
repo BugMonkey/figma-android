@@ -9,43 +9,90 @@ Figma 设计稿转 Android 代码。通过本地 Figma 桌面端插件读取节�
 1. **在 Android 项目根目录启动 Agent**，说「启动」。
    Agent 会检查 Python、桥服务器和 Figma 插件，缺什么会引导补什么。
 2. **在 Figma 桌面端选中画板**，右键 → Plugins → Development → `figma-android-bridge`。
-   首次使用先 Import plugin from manifest...，选择 `scripts/plugin/manifest.json`。
-3. **对 Agent 说出意图**，例如「生成首页」「按设计稿改登录页」「导出这个画板的切图」「检查还原度」。
+   首次使用先 Import plugin from manifest...，选择 `~/.claude/skills/figma-android/scripts/plugin/manifest.json`。
+3. **在 Claude Code 里显式调用**，例如 `/figma-android 生成首页`、`/figma-android 按设计稿改登录页`、`/figma-android 检查还原度`。
    Agent 先展示结构方案，回复「确认」后生成并编译验证。
 
 ## 安装
 
-`skillhub install` 会下载到 `@user_140863df/figma-android` 命名空间目录；ZCode / Claude Code 只扫描 `skills/<name>/SKILL.md` 平铺结构，所以要复制到平铺目录：
+Claude Code 的个人 Skill 目录是 `~/.claude/skills/<name>/SKILL.md`；项目级用 `<android-project>/.claude/skills/<name>/`。下面以个人目录为例，其他 Agent 宿主把路径换成自己的 skills 目录。
+
+### 方式一：GitHub clone（推荐）
+
+```bash
+mkdir -p ~/.claude/skills
+git clone git@github.com:BugMonkey/figma-android.git ~/.claude/skills/figma-android
+```
+
+仓库公开后也可以走 HTTPS：
+
+```bash
+git clone https://github.com/BugMonkey/figma-android.git ~/.claude/skills/figma-android
+```
+
+### 方式二：从本地目录复制
+
+macOS / Linux：
+
+```bash
+mkdir -p ~/.claude/skills/figma-android
+rsync -a --exclude .git --exclude __pycache__ \
+  /path/to/figma-android/ ~/.claude/skills/figma-android/
+```
+
+Windows PowerShell：
+
+```powershell
+robocopy "C:\path\to\figma-android" "$HOME\.claude\skills\figma-android" /E /XD .git __pycache__
+```
+
+### 方式三：GitHub ZIP
+
+GitHub 仓库页 → Code → Download ZIP，解压到 `~/.claude/skills/figma-android`，确认 `SKILL.md` 直接在目录下。
+
+### 方式四：SkillHub（可选）
 
 ```bash
 tmp=$(mktemp -d)
 skillhub install figma-android --namespace user_140863df --dir "$tmp"
-mkdir -p ~/.agents/skills/figma-android
-cp -R "$tmp/@user_140863df/figma-android/." ~/.agents/skills/figma-android/
+mkdir -p ~/.claude/skills/figma-android
+cp -R "$tmp/@user_140863df/figma-android/." ~/.claude/skills/figma-android/
 rm -rf "$tmp"
 ```
 
-Claude Code 把目标目录换成 `~/.claude/skills/figma-android`。
+`skillhub install` 会下载到 `@user_140863df/figma-android` 命名空间目录，所以要复制到平铺目录。`skillhub list` 不会显示 `--dir` 安装，以实际目录为准。
 
-验证：
+### 验证
 
 ```bash
-grep -m1 '^version:' ~/.agents/skills/figma-android/SKILL.md
-python3 ~/.agents/skills/figma-android/scripts/common/figma_selftest.py
+grep -m1 '^version:' ~/.claude/skills/figma-android/SKILL.md   # 1.0.1
+python3 ~/.claude/skills/figma-android/scripts/common/figma_selftest.py
 ```
 
-Figma 插件：
+在 Claude Code 中执行 `/reload-skills` 或重启。
+
+### Figma 插件
 
 1. 打开 Figma 桌面端。
 2. 右键画布 → Plugins → Development → Import plugin from manifest...
-3. 选择 `~/.agents/skills/figma-android/scripts/plugin/manifest.json`（Claude Code 用 `~/.claude/skills/...`）。
+3. 选择 `~/.claude/skills/figma-android/scripts/plugin/manifest.json`。
 4. Development 菜单里会出现 `figma-android-bridge`。
 
-`skillhub list` 不会显示 `--dir` 安装的 Skill，以实际目录和 `SKILL.md` 为准。
+### 使用
+
+本 Skill 设置了 `disable-model-invocation`，必须用 `/figma-android` 显式调用：
+
+```text
+/figma-android 生成首页
+/figma-android 按设计稿改登录页
+/figma-android 检查还原度
+```
 
 ## 提示词速查
 
-| 你想做什么 | 对 Agent 说 | 得到什么 |
+> 本 Skill 设置了 `disable-model-invocation`，必须用 `/figma-android` 显式调用；下表是 `/figma-android` 后面的意图描述。
+
+| 你想做什么 | 在 `/figma-android` 后说 | 得到什么 |
 |-----------|------------|---------|
 | 生成完整页面 | 「生成首页」「帮我实现这个登录页」 | XML + 资源 + 切图 + Activity |
 | 只要布局 | 「只要布局」「只生成这个弹窗的 XML」 | XML + 资源 |
@@ -119,10 +166,10 @@ app/src/main/java/.../<PageName>Activity.kt
 ## 常见问题
 
 **Q：插件连不上？**
-先确认 Figma 桌面端已启动、插件面板已打开，然后对 Agent 说「启动」重新检查。首次使用需要 Import `scripts/plugin/manifest.json`。
+先确认 Figma 桌面端已启动、插件面板已打开，然后用 `/figma-android 启动` 重新检查。首次使用需要 Import `scripts/plugin/manifest.json`。
 
 **Q：有 Figma 分享链接能用吗？**
-不能。当前只支持本地桥模式，请在 Figma 桌面端选中画板后直接说意图。
+不能。当前只支持本地桥模式，请在 Figma 桌面端选中画板后，用 `/figma-android` 说意图。
 
 **Q：生成的代码能直接用吗？**
 布局和资源经过 `./gradlew assembleDebug` 验证，但不包含 ViewModel、网络、数据层等业务逻辑，需要你自己接入。
@@ -160,6 +207,7 @@ figma-android/
 
 | 版本 | 日期 | 内容 |
 |------|------|------|
+| 1.0.1 | 2026-10-28 | README 增加 GitHub clone / 本地复制 / ZIP / SkillHub 四种安装方式；明确 Claude Code 路径和 /figma-android 显式调用 |
 | 1.0.0 | 2026-10-28 | 从原 Android 插件独立提取为 `figma-android`；重置版本记录；补齐 SkillHub manifest、LICENSE 和使用说明 |
 
 ## 维护

@@ -2,7 +2,7 @@
 name: figma-android
 slug: figma-android
 displayName: Figma Android 设计稿
-version: 1.0.0
+version: 1.0.1
 summary: Figma 设计稿转 Android：本地桥读取节点树/截图/切图，生成布局与页面、改造已有页面并做还原度检查。
 license: MIT
 description: Figma 设计稿数据读取、解析，提供生成 Android 布局文件指导、切图导出。支持设计稿画板查看、设计评估、图标下载等场景。
