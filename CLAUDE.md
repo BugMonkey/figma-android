@@ -7,6 +7,7 @@ Skill 被用户通过 `/` 命令或自然语言触发时，由 Claude Code 在�
 
 ```
 .                     # skill 源码（本仓库）
+├── .claude-plugin/plugin.json # Skill manifest
 ├── SKILL.md          # skill 入口定义 — 意图匹配 + 执行流程 + Hard Rules
 ├── commands/         # 命令处理指南（Agent 匹配意图后读取）
 │   ├── start.md         环境初始化/启动引导

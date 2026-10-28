@@ -8,9 +8,10 @@
 ├── AGENTS.md                   # 本文件，仅供人类维护者阅读
 ├── CLAUDE.md                   # 项目指令，被 Claude Code 自动加载
 ├── README.md                   # 面向用户的使用说明
+├── .claude-plugin/plugin.json  # Skill manifest
 ├── commands/                   # 命令处理指南（9 个，Agent 匹配意图后读取）
 ├── modes/                      # 数据通道
-│   ├── current_mode.txt            # 当前模式（固定为 plugin）
+│   ├── current_mode.txt        # 当前模式（固定为 plugin）
 │   └── bridge-execution.md     # 桥模式执行清单 + 决策树 + 脚本工具箱
 ├── rules/                      # Agent 行为规则（9 个，按阶段读取）
 ├── schemas/                    # 产物 Schema 文档（5 个）

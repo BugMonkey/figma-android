@@ -1,5 +1,5 @@
 ---
-name: figma-change-impact-schema
+name: figma-android-change-impact-schema
 description: 老页面改造影响分析的结构定义（会话内输出），及落任务记忆节的字段映射
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: figma-verify-schema
+name: figma-android-verify-schema
 description: 编译验证状态定义，build/blocker/verified_scope 字段写入 figma_task_memory.md 任务记忆节的规范
 ---
 

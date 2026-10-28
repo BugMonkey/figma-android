@@ -2,7 +2,7 @@
 name: figma-android
 slug: figma-android
 displayName: Figma Android 设计稿
-version: 1.0.1021
+version: 1.0.0
 summary: Figma 设计稿转 Android：本地桥读取节点树/截图/切图，生成布局与页面、改造已有页面并做还原度检查。
 license: MIT
 description: Figma 设计稿数据读取、解析，提供生成 Android 布局文件指导、切图导出。支持设计稿画板查看、设计评估、图标下载等场景。
@@ -82,7 +82,7 @@ Figma 设计稿转 Android 代码。通过本地 Figma 桌面端插件拉取设�
 4. 产物结构校验：python3 scripts/common/figma_validate_tree.py "<extract_dir>"
    → blocked（exit 2）禁止进入 4.5/5/生成，回报缺失项并建议 --force 重拉
 
-4.5 【意图先行】进入结构确认前，先提炼实现意图（参考 lanhu-android 意图先行）：
+4.5 【意图先行】进入结构确认前，先提炼实现意图：
    页面归属（Fragment/Activity/Dialog/Item）、架构边界（底部 Tab 是否宿主所有）、
    核心交互（列表/横滑/按钮/状态切换）、数据区域（动态/静态/复用 item）、用户明确取舍（保留/排除区域）
    → 产出 `implementation_context`，作为步骤 5a 结构化查询与 5b 截图分析（子 agent prompt）的输入上下文

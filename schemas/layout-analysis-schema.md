@@ -1,6 +1,6 @@
 ---
-name: figma-layout-analysis-schema
-description: layout_analysis.json 标准结构，供结构确认环节（步骤 5）产出与消费。参考 lanhu-android 的 layout-analysis-schema 适配 Figma 桥模式。
+name: figma-android-layout-analysis-schema
+description: layout_analysis.json 标准结构，供结构确认环节（步骤 5）产出与消费，按 Figma 桥模式适配。
 ---
 
 # layout_analysis.json Schema
