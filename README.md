@@ -190,6 +190,7 @@ figma-android/
 ├── SKILL.md                      # 入口：意图匹配 + 流程 + Hard Rules
 ├── AGENTS.md                     # 维护者指南
 ├── CLAUDE.md                     # 项目指令
+├── agents/                       # 配套 subagent（xml-reviewer 布局交付前审查）
 ├── commands/                     # 9 个命令说明
 ├── modes/                        # 数据通道（current_mode.txt + bridge-execution.md）
 ├── rules/                        # 9 个行为规则
@@ -207,6 +208,7 @@ figma-android/
 
 | 版本 | 日期 | 内容 |
 |------|------|------|
+| 1.0.2 | 2026-10-28 | 坐标映射限定叠放/锚定，纵向流式内容不再逐块写绝对 marginTop；全宽切图比例不一致禁 fitXY；截图分析追加适配风险追问；结构确认新增逐 artifact 四个必答槽位；新增自适应自检；配套 `agents/xml-reviewer.md` |
 | 1.0.1 | 2026-10-28 | README 增加 GitHub clone / 本地复制 / ZIP / SkillHub 四种安装方式；明确 Claude Code 路径和 /figma-android 显式调用 |
 | 1.0.0 | 2026-10-28 | 从原 Android 插件独立提取为 `figma-android`；重置版本记录；补齐 SkillHub manifest、LICENSE 和使用说明 |
 
