@@ -24,11 +24,16 @@ element_classification / component_groups / constraint_hints / implementation_hi
 （字段结构见 schemas/layout-analysis-schema.md）
 要求：区域划分覆盖全页从上到下；只做定性判断，禁止编造精确坐标/颜色/字号/圆角/间距；
 不确定的项写入 risk_flags。不输出图片内容、base64 或逐像素描述。
+另外按图中比例回答这几类适配风险（只给定性判断，不换算精确数值）：
+屏高明显小于画板时哪些元素会先出屏、屏宽变宽或变窄时哪些全宽切图会变形、
+字号放大时哪些文本会溢出、哪些切图背景内部还叠着按坐标定位的子元素（背景缩放后会错位）、
+哪些元素贴容器边。
 若你无法读取这张图片，只输出 {"viewed": false, "reason": "无法读取图片"}，不要输出任何视觉结论。
 ```
 
 - **产物**：主 Agent 取子 agent 的定性结论，补齐 `schema_version`、`design_id`、`user_intent` 等元数据并与 5a 定性结论合并，写入 `<extract_dir>/layout_analysis.json`（结构见 `schemas/layout-analysis-schema.md`）。
-- **主 Agent 职责**：结合 android_tree.json 验证子 agent 的定性结论（bounds/children 确认容器归属与重叠），输出用户确认摘要
+- **主 Agent 职责**：结合 android_tree.json 验证子 agent 的定性结论（bounds/children 确认容器归属与重叠），输出用户确认摘要。
+  子 agent 只给风险标记，**具体是否出屏、高度差多少必须由主 Agent 用 android_tree 实算**，并写进确认摘要的必填槽位（见 `commands/create-page.md` 步骤 3）
 - 截图分析只输出定性结论；精确坐标/尺寸/颜色仍以 android_tree.json 为准（Hard Rule 17）
 
 > **严禁在未真正查看过截图的情况下臆断截图内容**：未派发子 agent 或子 agent 未成功读取截图时，不得声称已完成视觉理解。

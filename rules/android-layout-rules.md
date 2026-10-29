@@ -79,9 +79,11 @@ PxxxSemibold  → android:textStyle="bold"
 
 | 场景 | 使用 |
 |------|------|
-| ConstraintLayout 根布局 | `dp.x` / `dp.y` → `marginStart` / `marginTop` |
-| FrameLayout / LinearLayout 嵌套 | `dp_local.x` / `dp_local.y` → 相对父容器偏移 |
+| ConstraintLayout 根布局 | `dp.x` / `dp.y` → `marginStart` / `marginTop`，**仅限叠放与锚定关系**（背景层、悬浮角标、贴边元素） |
+| FrameLayout / LinearLayout 嵌套 | `dp_local.x` / `dp_local.y` → 相对父容器偏移，同样仅限叠放与锚定 |
 | 尺寸 | `dp.w` / `dp.h` → `layout_width` / `layout_height` |
+
+**纵向先后排列的内容不要逐块写绝对 `marginTop`**：先按视觉归组为流式容器（LinearLayout，或带链的 ConstraintLayout），容器内只写相邻间距，容器整体位置用居中 / 顶锚 / 底锚表达。`dp.y` 的绝对值只用于重叠与贴边；同一布局里绝对定位的区块数量应与重叠组数一致，多出来的就是没做归一化。
 
 ### 铺满判定（简单粗暴）
 
@@ -144,7 +146,7 @@ PxxxSemibold  → android:textStyle="bold"
 | 图片内容 | layout_width / layout_height |
 |----------|------------------------------|
 | 图标/静态切图（drawable-xxhdpi PNG） | wrap_content / wrap_content |
-| 背景/整卡切图（铺满容器） | match_parent / wrap_content + adjustViewBounds="true" + scaleType="fitXY" |
+| 背景/整卡切图（铺满容器） | 宽度随容器、高度保持原图比例（`adjustViewBounds` 或 ConstraintLayout `dimensionRatio`）；容器与切图比例不一致时禁止 `fitXY`（会横向拉伸），改用等比缩放或可拉伸资源（shape / 9-patch） |
 | 动态填充（Glide/Coil 网络图、头像） | 固定尺寸（如 60.7×61dp） |
 
 判断：src 是 drawable 切图 → wrap_content；src 被代码动态替换为网络图 → 固定尺寸。
@@ -156,7 +158,8 @@ PxxxSemibold  → android:textStyle="bold"
 |------|------|
 | 横向一排等分 | 外层 LinearLayout horizontal + paddingHorizontal 固定边距 + 子项 width="0dp" weight="1" |
 | 铺满宽度 | match_parent + 对称 margin（左右边距相近用 layout_marginHorizontal） |
-| 顶部背景 + 内部定位元素 | 背景图放底层（见 4.0），内部元素 layout_gravity + marginTop 叠放 |
+| 顶部背景 + 内部定位元素 | 背景图放底层（见 4.0），**仅锚定到该背景的元素**用 layout_gravity + marginTop 叠放；背景等比缩放时内部元素按重力/百分比跟随，不用屏幕绝对坐标 |
+| 组合块（卡面 + 缎带 + 文字等多层切图） | 外层固定比例容器（`dimensionRatio` 或设计尺寸），内部再叠放；整体随宽度缩放，禁止每层各自 match_parent + 固定高 + fitXY |
 | 内容超屏 | 根 NestedScrollView，底部固定按钮不放滚动容器 |
 
 ### 4.1 切图缺失处理
@@ -212,6 +215,17 @@ tools:src="@drawable/img_xxx"
 3. `android:id` 是否重复
 4. `tools:listitem` / `tools:itemCount` 的 layout 文件是否存在
 5. 重叠区域的 z-order 是否正确（XML 声明顺序 = children 数组顺序）
+
+### 9.1 自适应自检（交付前必过）
+
+参考屏：宽 320 / 360 / 411dp，高 640dp，字体放大 1.3 倍。逐 artifact（页面、每个弹窗/浮层、每个列表 item）检查：
+
+1. **短屏不裁切**：640dp 高下内容完整可见，或已明确声明可滚动；
+2. **切图不变形**：全宽切图在 320 / 411dp 宽下保持原图长宽比；
+3. **热区跟随**：点击区域与其视觉目标同容器、同源定位，不随屏幕宽度漂移；
+4. **文本可更新**：会随数据变化的文本是独立 TextView，未烘焙进切图。
+
+任一不满足即为交付缺陷，不允许以「目测没问题」放行；确实不适用时在摘要注明原因，不写死结论。
 
 ---
 

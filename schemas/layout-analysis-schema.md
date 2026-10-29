@@ -226,7 +226,7 @@ description: layout_analysis.json 标准结构，供结构确认环节（步骤 
 
 ```json
 {
-  "code": "missing_screenshot | missing_visual_review | uncertain_grouping | complex_list | host_navigation_uncertain | dynamic_region_uncertain | inset_uncertain | context_bloat_risk | requires_manual_confirm",
+  "code": "missing_screenshot | missing_visual_review | uncertain_grouping | complex_list | host_navigation_uncertain | dynamic_region_uncertain | inset_uncertain | context_bloat_risk | requires_manual_confirm | short_screen_clip_risk | width_stretch_risk | font_scale_risk | scaled_block_child_drift_risk",
   "severity": "high | medium | low",
   "message": "string",
   "blocked": false

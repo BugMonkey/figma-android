@@ -14,6 +14,12 @@
 3. **【阻塞】结构确认**：按视觉区域/容器重叠/元素归组/滚动策略/切图覆盖输出，等待用户确认。
    - 如有 `repeat_groups` 数据，必须逐项提问：每个重复模式使用 RecyclerView 还是内联固定布局。用户只需回答"是"或"否"。
    - 对于 2 项的重复，追问"接口可能返回更多吗"以决定是否使用 RecyclerView。
+   - **必须逐 artifact 回答四个适配槽位**（页面本体、每个弹窗/浮层、每个列表 item 各一行，每格一句结论，由 android_tree 实算）：
+     ① 小屏（屏高 ≤ 640dp）行为——滚动 / 压缩 / 底锚，选一；
+     ② 窄屏与宽屏（≤ 320dp / ≥ 411dp）——哪些全宽切图需要等比，哪些用固定宽居中；
+     ③ 字号放大 1.3 倍——哪些文本会溢出、容器是否写死高度；
+     ④ 贴边与热区——哪些元素贴容器边（底/右/顶）、哪些点击区对应烘焙在图里的图标。
+     任一槽位为空或写「待定」不得进入步骤 4。
 4. 生成 XML 布局：按 `rules/visual-grouping-rules.md` + `rules/android-layout-rules.md`。
 5. 生成资源：shape drawable、colors、dimens。命名规则见 `rules/resource-naming-rules.md`。
 6. 生成 Activity/Fragment 骨架：setContentView + ViewBinding 初始化。
